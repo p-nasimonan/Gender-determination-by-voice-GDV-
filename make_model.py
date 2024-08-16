@@ -8,14 +8,11 @@ import numpy as np
 import pandas as pd
 import os
 import tkinter as tk
-from tkinter import ttk
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import zipfile
 import requests
-import csv
-import threading
 
 def download_data(url: str, save_path: str):
     """

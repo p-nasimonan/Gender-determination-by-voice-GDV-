@@ -5,8 +5,6 @@
 from make_model import extract_log_mel_spectrogram
 
 import tensorflow as tf
-import numpy as np
-import pandas as pd
 import librosa
 import soundfile as sf
 import os

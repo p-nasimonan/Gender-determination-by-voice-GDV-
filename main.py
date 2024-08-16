@@ -7,10 +7,6 @@ import json #JSONファイルの読み込みを行うために使用。
 from tkinter import * #tkinterモジュール内で定義されているメソッドや変数をまとめてインポート
 from tkinter import filedialog #tkinter内のfiledialogを使用するために記述。
 
-import time
-
-import numpy as np 
-import pandas as pd 
 
 import analys
 import make_model
