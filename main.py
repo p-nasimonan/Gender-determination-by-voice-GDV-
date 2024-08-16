@@ -1,17 +1,60 @@
 import sys #システム関連の機能を提供するライブラリ
 import tkinter as tk #GUIライブラリ
-import os #OS機能を使用するライブラリ。ファイル名の取得を行うために使用。
+import os
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
 import json #JSONファイルの読み込みを行うために使用。
 from tkinter import * #tkinterモジュール内で定義されているメソッドや変数をまとめてインポート
 from tkinter import filedialog #tkinter内のfiledialogを使用するために記述。
-import librosa #音声ファイルの読み込みを行うために使用。
+
+import time
+
 import numpy as np 
 import pandas as pd 
+
 import analys
-from make_model import make_model
+import make_model
 
 data_path = "data/jvs_ver1.zip"
-model_path = "gender_classification_model.h5"
+dataset_path = "data/dataset.csv"
+model_path = "gender_classification_model.keras"
+max_length = 128 * 100  # 128メルバンド * 100フレーム（例）
+
+labels = []
+
+def open_settings_window(bg_color: str, text_color: str):
+    settings_window = Toplevel()
+    settings_window.title("設定")
+    settings_window.geometry("600x200")
+    settings_window.config(bg=bg_color)
+    
+    # 進捗状況を表示するラベル
+    progress_label = tk.Label(settings_window, text="", bg=bg_color, fg=text_color)
+    progress_label.place(x=100, y=80)
+
+    # モデルを作成するボタン
+    make_model_button = tk.Button(settings_window, text="モデルを作成する", command=lambda: make_model.make_model(data_path, model_path, progress_label, max_length, dataset_path), bg="white", fg="black")
+    make_model_button.place(x=100, y=40)
+
+    #消したかわかるラベル
+    delete_label = tk.Label(settings_window, text="", bg=bg_color, fg=text_color)
+    delete_label.place(x=100, y=160)
+
+    #データセットを削除するボタン
+    delete_dataset_button = tk.Button(settings_window, text="データセットを削除する", command=lambda: make_model.delete_dataset(dataset_path, delete_label), bg="white", fg="black")
+    delete_dataset_button.place(x=100, y=120)
+
+
+    return settings_window
+
+
+def delete_cache():
+    global labels
+    for file in os.listdir("tmp"):
+        os.remove("tmp/"+file)
+    for label in labels:
+        label.destroy()
+    labels = []
 
 def make_window(width: int, height: int, bg_color: str, text_color: str) -> tk.Tk:
     """
@@ -41,26 +84,33 @@ def make_window(width: int, height: int, bg_color: str, text_color: str) -> tk.T
     # ウィンドウのアイコンを設定
     result.iconbitmap(r"icon.ico")
 
-    # 進捗状況を表示するラベル
-    progress_label = tk.Label(result, text="", bg=bg_color, fg=text_color)
-    progress_label.place(x=100, y=80)
+    # メニューバーを作成
+    menubar = tk.Menu(result)
+    result.config(menu=menubar)
 
-    # モデルを作成するボタン
-    make_model_button = tk.Button(result, text="モデルを作成する", command=lambda: make_model(data_path, model_path, progress_label), bg="white", fg="black")
-    make_model_button.place(x=100, y=40)
+    # 設定メニューを追加
+    settings_menu = tk.Menu(menubar, tearoff=0)
+    menubar.add_cascade(label="設定", menu=settings_menu)
+    settings_menu.add_command(label="設定を開く", command=lambda: open_settings_window(bg_color, text_color))
+
+
 
     # ファイルパスのボックスとファイルを開くボタンを作成
     box_and_file_open_button(result, "音声ファイルを開く", bg_color, text_color, 100, 100)
 
+    # リロードボタン
+    reload_button = tk.Button(result, text="✖", command=delete_cache, bg="white", fg="black")
+    reload_button.place(x=70, y=100)
+
     return result
 
-
 def box_and_file_open_button(window: tk.Tk, text: str, bg_color: str, text_color: str, x: int, y: int):
+    global labels
     file_path_var = tk.StringVar()  # StringVarを使用してファイルパスを管理
 
     def click_file_open_button():
         try:
-            files_path = filedialog.askopenfilenames(filetypes=[("音声ファイル", "*.wav")])
+            files_path = filedialog.askopenfilenames(filetypes=[("音声ファイル", "*.wav;*.mp3")])
             if files_path == () or files_path is None:
                 print("ファイルパスが空です")
                 return
@@ -69,13 +119,14 @@ def box_and_file_open_button(window: tk.Tk, text: str, bg_color: str, text_color
             return
         file_path_var.set(files_path)  # StringVarにファイルパスを設定
         for index, file_path in enumerate(files_path):
-            file, gender = analys.what_is_gender(file_path, data_path, model_path) #解析
-        
-        # ファイル名と性別を表示
-        label = tk.Label(window, text=f"{file}: {gender}", bg=bg_color, fg=text_color)
-        label.place(x=x-100, y=(y+100)+(20*index))
-        label_x, label_y = x-100, (y+100)+(20*index)
-        label.place(x=label_x, y=label_y)
+            gender = analys.what_is_gender(file_path, model_path, max_length) #解析
+            print(file_path, gender)
+            # ファイル名と性別を表示
+            label = tk.Label(window, text=f"{file_path}: {gender}", bg=bg_color, fg=text_color)
+            label_x, label_y = x-50, (y+50)+(20*index)
+            label.place(x=label_x, y=label_y)
+            labels.append(label)
+
     
     #ファイルパスが表示されるボックス
     file_path_box = tk.Entry(window, width=40, textvariable=file_path_var, bg=bg_color, fg=text_color)
@@ -91,8 +142,8 @@ def read_config() -> tuple:
     with open("config.json", "r") as f:
         config = json.load(f)
     theme = config["theme"]
-    learning_data = config["learning_data"]
-    return theme, learning_data
+
+    return theme
 
 
 def start(theme: str):
@@ -110,6 +161,6 @@ def start(theme: str):
 
 
 if __name__ == "__main__":
-    theme, analys.learning_data = read_config()
+    theme = read_config()
     
     start(theme)
